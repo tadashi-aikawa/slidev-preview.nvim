@@ -1,4 +1,4 @@
-# slidev-preview
+# slidev-preview.nvim
 
 Neovim plugin that syncs your Slidev presentation in the browser with your cursor position in `slides.md`.
 
@@ -22,7 +22,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 
 ```lua
 {
-  'tadashi-aikawa/slidev-preview',
+  'tadashi-aikawa/slidev-preview.nvim',
   ft = 'markdown',
   opts = {},
 }
@@ -32,7 +32,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 
 ```lua
 {
-  'tadashi-aikawa/slidev-preview',
+  'tadashi-aikawa/slidev-preview.nvim',
   ft = 'markdown',
   opts = {
     port = 3030,              -- Slidev dev server port
