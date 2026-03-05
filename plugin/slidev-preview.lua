@@ -1,0 +1,1 @@
+-- Plugin entrypoint: no auto-setup, user must call require('slidev-preview').setup()

@@ -1,0 +1,169 @@
+local parser = require("slidev-preview.parser")
+local http = require("slidev-preview.http")
+local server = require("slidev-preview.server")
+
+local M = {}
+
+local config = {
+  port = 3030,
+  open_browser = true,
+  debounce_ms = 200,
+  slidev_bin = "npx slidev",
+}
+
+local state = {
+  enabled = false,
+  last_page = nil,
+  debounce_timer = nil,
+  augroup = nil,
+}
+
+--- Send navigation request to Slidev dev server.
+---@param page integer
+local function navigate_to_page(page)
+  if page == state.last_page then
+    return
+  end
+  state.last_page = page
+
+  local body = vim.json.encode({
+    data = {
+      page = page,
+      clicks = 0,
+      clicksTotal = 0,
+      lastUpdate = {
+        id = "neovim_slidev_preview",
+        type = "presenter",
+        time = math.floor(vim.uv.now()),
+      },
+    },
+  })
+
+  http.post("127.0.0.1", config.port, "/@server-reactive/nav", body)
+end
+
+--- Calculate and navigate to the current page based on cursor position.
+local function sync_page()
+  local bufname = vim.api.nvim_buf_get_name(0)
+  if not bufname:match("slides%.md$") then
+    return
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local page = parser.get_page_at_line(lines, cursor_line)
+  navigate_to_page(page)
+end
+
+--- Debounced sync: reset timer on each cursor move.
+local function debounced_sync()
+  if state.debounce_timer then
+    state.debounce_timer:stop()
+    if not state.debounce_timer:is_closing() then
+      state.debounce_timer:close()
+    end
+  end
+
+  state.debounce_timer = vim.defer_fn(function()
+    sync_page()
+  end, config.debounce_ms)
+end
+
+--- Enable cursor tracking autocmds.
+local function enable_tracking()
+  if state.enabled then
+    return
+  end
+
+  state.augroup = vim.api.nvim_create_augroup("SlidevPreview", { clear = true })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+    group = state.augroup,
+    pattern = "slides.md",
+    callback = debounced_sync,
+  })
+
+  state.enabled = true
+end
+
+--- Disable cursor tracking autocmds.
+local function disable_tracking()
+  if not state.enabled then
+    return
+  end
+
+  if state.augroup then
+    vim.api.nvim_del_augroup_by_id(state.augroup)
+    state.augroup = nil
+  end
+
+  if state.debounce_timer then
+    state.debounce_timer:stop()
+    if not state.debounce_timer:is_closing() then
+      state.debounce_timer:close()
+    end
+    state.debounce_timer = nil
+  end
+
+  state.enabled = false
+  state.last_page = nil
+end
+
+--- Start preview: launch dev server + enable cursor sync.
+local function cmd_start()
+  server.start({
+    port = config.port,
+    slidev_bin = config.slidev_bin,
+    open_browser = config.open_browser,
+  })
+  enable_tracking()
+end
+
+--- Stop preview: stop dev server + disable cursor sync.
+local function cmd_stop()
+  disable_tracking()
+  server.stop()
+end
+
+--- Open browser to current page (assumes server is running).
+local function cmd_open()
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local page = parser.get_page_at_line(lines, cursor_line)
+  server.open_browser(config.port, page)
+  enable_tracking()
+end
+
+--- Show current status.
+local function cmd_status()
+  local parts = {}
+  table.insert(parts, "Server: " .. (server.is_running() and "running" or "stopped"))
+  table.insert(parts, "Port: " .. config.port)
+  table.insert(parts, "Tracking: " .. (state.enabled and "enabled" or "disabled"))
+  if state.last_page then
+    table.insert(parts, "Page: " .. state.last_page)
+  end
+  vim.notify("[slidev-preview] " .. table.concat(parts, " | "))
+end
+
+--- Setup the plugin.
+---@param opts? table
+function M.setup(opts)
+  config = vim.tbl_deep_extend("force", config, opts or {})
+
+  vim.api.nvim_create_user_command("SlidevPreviewStart", cmd_start, { desc = "Start Slidev preview" })
+  vim.api.nvim_create_user_command("SlidevPreviewStop", cmd_stop, { desc = "Stop Slidev preview" })
+  vim.api.nvim_create_user_command("SlidevPreviewOpen", cmd_open, { desc = "Open browser to current slide" })
+  vim.api.nvim_create_user_command("SlidevPreviewStatus", cmd_status, { desc = "Show Slidev preview status" })
+
+  -- Clean up on Neovim exit to prevent zombie processes
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    callback = function()
+      if server.is_running() then
+        server.stop()
+      end
+      disable_tracking()
+    end,
+  })
+end
+
+return M
