@@ -2,3 +2,4 @@
 *.swo
 *~
 .luarc.json
+.nvimlog
