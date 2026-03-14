@@ -35,9 +35,8 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
   'tadashi-aikawa/slidev-preview.nvim',
   ft = 'markdown',
   opts = {
-    port = 3030,              -- Slidev dev server port
-    open_browser = true,      -- Auto-open browser on :SlidevPreviewStart
-    debounce_ms = 200,        -- Cursor debounce interval (ms)
+    port = 3030,               -- Slidev dev server port
+    debounce_ms = 200,         -- Cursor debounce interval (ms)
     slidev_bin = 'npx slidev', -- Command to run Slidev
   },
 }
@@ -49,7 +48,8 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 
 | Command | Description |
 |---|---|
-| `:SlidevPreviewStart` | Start Slidev dev server and open browser. Enables cursor sync. |
+| `:SlidevPreviewStart` | Start Slidev dev server without opening browser. Enables cursor sync. |
+| `:SlidevPreviewStartAndOpen` | Start Slidev dev server, then open browser. Enables cursor sync. |
 | `:SlidevPreviewStop` | Stop the dev server and disable cursor sync. |
 | `:SlidevPreviewOpen` | Open browser to the current slide (server must be running). |
 | `:SlidevPreviewStatus` | Show current status (server, port, tracking, page). |
@@ -58,7 +58,8 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 
 1. Open `slides.md` in Neovim
 2. Run `:SlidevPreviewStart`
-3. Move your cursor — the browser follows!
+3. Open the browser later with `:SlidevPreviewOpen`, or use `:SlidevPreviewStartAndOpen` if you want to open it immediately
+4. Move your cursor — the browser follows!
 
 If you prefer to start the Slidev dev server yourself (e.g., in a separate terminal), just use `:SlidevPreviewOpen` to open the browser and enable cursor sync.
 

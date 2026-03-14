@@ -6,7 +6,6 @@ local M = {}
 
 local config = {
   port = 3030,
-  open_browser = true,
   debounce_ms = 200,
   slidev_bin = "npx slidev",
 }
@@ -108,14 +107,25 @@ local function disable_tracking()
   state.last_page = nil
 end
 
---- Start preview: launch dev server + enable cursor sync.
-local function cmd_start()
+--- Start preview: launch dev server and optionally open browser.
+---@param open_browser boolean
+local function start_preview(open_browser)
   server.start({
     port = config.port,
     slidev_bin = config.slidev_bin,
-    open_browser = config.open_browser,
+    open_browser = open_browser,
   })
   enable_tracking()
+end
+
+--- Start preview: launch dev server without opening browser.
+local function cmd_start()
+  start_preview(false)
+end
+
+--- Start preview: launch dev server and open browser.
+local function cmd_start_and_open()
+  start_preview(true)
 end
 
 --- Stop preview: stop dev server + disable cursor sync.
@@ -150,7 +160,8 @@ end
 function M.setup(opts)
   config = vim.tbl_deep_extend("force", config, opts or {})
 
-  vim.api.nvim_create_user_command("SlidevPreviewStart", cmd_start, { desc = "Start Slidev preview" })
+  vim.api.nvim_create_user_command("SlidevPreviewStart", cmd_start, { desc = "Start Slidev preview server" })
+  vim.api.nvim_create_user_command("SlidevPreviewStartAndOpen", cmd_start_and_open, { desc = "Start Slidev preview server and open browser" })
   vim.api.nvim_create_user_command("SlidevPreviewStop", cmd_stop, { desc = "Stop Slidev preview" })
   vim.api.nvim_create_user_command("SlidevPreviewOpen", cmd_open, { desc = "Open browser to current slide" })
   vim.api.nvim_create_user_command("SlidevPreviewStatus", cmd_status, { desc = "Show Slidev preview status" })
