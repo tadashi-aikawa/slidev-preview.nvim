@@ -13,11 +13,11 @@ function M.is_server_ready()
 end
 
 --- Start the Slidev dev server.
----@param opts { port: integer, slidev_bin: string, open_browser: boolean }
+---@param opts { port: integer, slidev_bin: string, open_browser: boolean, cwd: string }
 function M.start(opts)
   if job_id then
     vim.notify("[slidev-preview] Server is already running", vim.log.levels.WARN)
-    return
+    return false
   end
 
   is_ready = false
@@ -26,7 +26,7 @@ function M.start(opts)
   local cmd = opts.slidev_bin .. " --port " .. opts.port .. " --remote --no-open"
 
   job_id = vim.fn.jobstart(cmd, {
-    cwd = vim.fn.getcwd(),
+    cwd = opts.cwd,
     on_stdout = function(_, data)
       for _, line in ipairs(data) do
         if not is_ready and (line:match("http://localhost") or line:match("ready in")) then
@@ -62,10 +62,11 @@ function M.start(opts)
   if job_id <= 0 then
     vim.notify("[slidev-preview] Failed to start server", vim.log.levels.ERROR)
     job_id = nil
-    return
+    return false
   end
 
   vim.notify("[slidev-preview] Starting Slidev dev server on port " .. opts.port)
+  return true
 end
 
 --- Stop the Slidev dev server.
