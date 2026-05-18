@@ -45,8 +45,9 @@ end
 
 --- Send navigation request to Slidev dev server.
 ---@param page integer
-local function navigate_to_page(page)
-  if page == state.last_page then
+---@param force? boolean
+local function navigate_to_page(page, force)
+  if not force and page == state.last_page then
     return
   end
   state.last_page = page
@@ -68,7 +69,8 @@ local function navigate_to_page(page)
 end
 
 --- Calculate and navigate to the current page based on cursor position.
-local function sync_page()
+---@param force? boolean
+local function sync_page(force)
   if not is_active_slidev_file() then
     return
   end
@@ -76,7 +78,7 @@ local function sync_page()
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
   local page = parser.get_page_at_line(lines, cursor_line)
-  navigate_to_page(page)
+  navigate_to_page(page, force)
 end
 
 --- Debounced sync: reset timer on each cursor move.
@@ -93,6 +95,13 @@ local function debounced_sync()
   end, config.debounce_ms)
 end
 
+--- Sync after Slidev reloads the saved file.
+local function sync_after_write()
+  vim.defer_fn(function()
+    sync_page(true)
+  end, config.debounce_ms)
+end
+
 --- Enable cursor tracking autocmds.
 local function enable_tracking()
   if state.enabled then
@@ -104,6 +113,11 @@ local function enable_tracking()
     group = state.augroup,
     pattern = { "slide.md", "slides.md" },
     callback = debounced_sync,
+  })
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    group = state.augroup,
+    pattern = { "slide.md", "slides.md" },
+    callback = sync_after_write,
   })
 
   state.enabled = true
