@@ -96,6 +96,28 @@ test("estimate total ignores code blocks", function()
   assert_eq(clicks.estimate_total(lines), 1, "v-click inside code block is ignored")
 end)
 
+test("estimate total counts dynamic code block line highlights", function()
+  local lines = {
+    "```vue [MethodBadge.vue] {1,18|2-8|10-15|17}{maxHeight:'80%', lines: true}",
+    '<script setup lang="ts">',
+    'import type { PrimitiveProps } from "reka-ui";',
+    "</script>",
+    "```",
+  }
+
+  assert_eq(clicks.estimate_total(lines), 3, "four code highlight stages = clicksTotal 3")
+end)
+
+test("estimate total counts dynamic imported snippet line highlights", function()
+  local lines = {
+    "# Refactor for maintainability",
+    "",
+    "<<< @/components/Button2.vue vue {1-|18-28|31-45}{lines:true,maxHeight:'90%'}",
+  }
+
+  assert_eq(clicks.estimate_total(lines), 2, "three imported snippet highlight stages = clicksTotal 2")
+end)
+
 test("estimate total counts v-clicks list items", function()
   local lines = {
     "<v-clicks>",

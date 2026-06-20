@@ -83,6 +83,71 @@ local function clicks_for_v_clicks_block(item_count, every)
   return math.ceil(item_count / every)
 end
 
+local function is_code_highlight_stage(stage)
+  local value = stage:match("^%s*(.-)%s*$")
+  if value == "" then
+    return false
+  end
+  if value == "all" or value == "none" or value == "*" then
+    return true
+  end
+  return value:match("^[%d,%-%s]+$") ~= nil and value:match("%d") ~= nil
+end
+
+local function count_code_highlight_stages(raw)
+  if not raw:find("|", 1, true) then
+    return nil
+  end
+
+  local stages = 0
+  for stage in (raw .. "|"):gmatch("([^|]*)|") do
+    if not is_code_highlight_stage(stage) then
+      return nil
+    end
+    stages = stages + 1
+  end
+
+  if stages <= 1 then
+    return nil
+  end
+  return stages
+end
+
+local function parse_code_animation(line)
+  local stages = nil
+  local raw_at = nil
+
+  for raw in line:gmatch("{([^{}]*)}") do
+    stages = stages or count_code_highlight_stages(raw)
+    raw_at = raw_at or raw:match("[\"']?at[\"']?%s*:%s*[\"']?([+-]?%d+)[\"']?")
+  end
+
+  if not stages then
+    return nil, nil
+  end
+  return stages - 1, raw_at
+end
+
+local function apply_code_animation(line, offset, total)
+  local code_clicks, raw_at = parse_code_animation(line)
+  if not code_clicks or code_clicks <= 0 then
+    return offset, total, false
+  end
+
+  local at = parse_at_value(raw_at)
+  if at == nil then
+    offset = offset + code_clicks
+    total = math.max(total, offset)
+  elseif raw_at and raw_at:match("^%s*[+-]") then
+    offset = offset + at + code_clicks
+    total = math.max(total, offset)
+  else
+    total = math.max(total, at + code_clicks)
+  end
+
+  return offset, total, true
+end
+
 --- Estimate Slidev clicksTotal from v-click directives in one slide.
 --- Returns nil when no supported click directive is found.
 ---@param lines string[]
@@ -117,8 +182,16 @@ function M.estimate_total(lines)
         end
       end
     elseif line:match("^%s*```") then
+      local has_code_animation
+      offset, total, has_code_animation = apply_code_animation(line, offset, total)
+      found = found or has_code_animation
+
       in_code_block = true
       code_opening = line:match("^(%s*`+)")
+    elseif line:match("^%s*<<<%s+") then
+      local has_code_animation
+      offset, total, has_code_animation = apply_code_animation(line, offset, total)
+      found = found or has_code_animation
     elseif line:match("<v%-clicks[%s>]") then
       v_clicks_block = {
         depth = parse_number_attr(line, "depth", 1),
