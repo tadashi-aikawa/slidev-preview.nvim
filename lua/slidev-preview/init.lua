@@ -201,6 +201,24 @@ local function cmd_stop()
   state.root_dir = nil
 end
 
+--- Restart preview: stop dev server if running, then start again without opening browser.
+local function cmd_restart()
+  local slides_path = get_current_slidev_file()
+  if not slides_path then
+    vim.notify("[slidev-preview] Current buffer is not slide.md or slides.md", vim.log.levels.WARN)
+    return
+  end
+
+  if server.is_running() then
+    disable_tracking()
+    server.stop()
+    state.slides_path = nil
+    state.root_dir = nil
+  end
+
+  start_preview(false)
+end
+
 --- Open browser to current page (assumes server is running).
 local function cmd_open()
   local slides_path = get_current_slidev_file()
@@ -249,6 +267,7 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("SlidevPreviewStart", cmd_start, { desc = "Start Slidev preview server" })
   vim.api.nvim_create_user_command("SlidevPreviewStartAndOpen", cmd_start_and_open, { desc = "Start Slidev preview server and open browser" })
   vim.api.nvim_create_user_command("SlidevPreviewStop", cmd_stop, { desc = "Stop Slidev preview" })
+  vim.api.nvim_create_user_command("SlidevPreviewRestart", cmd_restart, { desc = "Restart Slidev preview server" })
   vim.api.nvim_create_user_command("SlidevPreviewOpen", cmd_open, { desc = "Open browser to current slide" })
   vim.api.nvim_create_user_command("SlidevPreviewStatus", cmd_status, { desc = "Show Slidev preview status" })
 

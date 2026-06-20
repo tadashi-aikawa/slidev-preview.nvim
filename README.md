@@ -51,6 +51,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 | `:SlidevPreviewStart` | Start Slidev dev server without opening browser. Enables cursor sync. |
 | `:SlidevPreviewStartAndOpen` | Start Slidev dev server, then open browser. Enables cursor sync. |
 | `:SlidevPreviewStop` | Stop the dev server and disable cursor sync. |
+| `:SlidevPreviewRestart` | Restart the dev server without opening browser. Enables cursor sync. |
 | `:SlidevPreviewOpen` | Open browser to the current slide (server must be running). |
 | `:SlidevPreviewStatus` | Show current status (server, port, tracking, page). |
 
