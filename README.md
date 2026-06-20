@@ -56,6 +56,8 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 | `:SlidevPreviewOpen` | Open browser to the current slide (server must be running). |
 | `:SlidevPreviewClicksIncrement` | Increment clicks for the previewed slide. |
 | `:SlidevPreviewClicksDecrement` | Decrement clicks for the previewed slide. |
+| `:SlidevPreviewNext` | Move to the next slide and sync the Neovim cursor. |
+| `:SlidevPreviewPrevious` | Move to the previous slide and sync the Neovim cursor. |
 | `:SlidevPreviewStatus` | Show current status (server, port, tracking, page). |
 
 ### Keymaps
@@ -65,6 +67,8 @@ The plugin does not set default keymaps. Assign the clicks commands to any keys 
 ```lua
 vim.keymap.set('n', '<leader>sj', '<cmd>SlidevPreviewClicksIncrement<cr>', { desc = 'Slidev clicks +1' })
 vim.keymap.set('n', '<leader>sk', '<cmd>SlidevPreviewClicksDecrement<cr>', { desc = 'Slidev clicks -1' })
+vim.keymap.set('n', '<leader>sn', '<cmd>SlidevPreviewNext<cr>', { desc = 'Slidev next slide' })
+vim.keymap.set('n', '<leader>sp', '<cmd>SlidevPreviewPrevious<cr>', { desc = 'Slidev previous slide' })
 ```
 
 ### Workflow

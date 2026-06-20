@@ -166,6 +166,36 @@ local function update_clicks(delta)
   send_clicks_patch(page)
 end
 
+--- Move the cursor to another slide and navigate the preview.
+---@param delta integer
+local function move_slide(delta)
+  if not state.slides_path then
+    vim.notify(
+      "[slidev-preview] Preview page is not available. Run :SlidevPreviewOpen or :SlidevPreviewStart first",
+      vim.log.levels.WARN
+    )
+    return
+  end
+
+  if not is_active_slidev_file() then
+    vim.notify("[slidev-preview] Current buffer is not the started Slidev file", vim.log.levels.WARN)
+    return
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local current_page = parser.get_page_at_line(lines, cursor_line)
+  local target_page = current_page + delta
+  local target_line = parser.get_slide_content_start_line(lines, target_page)
+  if not target_line then
+    return
+  end
+
+  vim.api.nvim_win_set_cursor(0, { target_line, 0 })
+  vim.cmd("normal! zt")
+  navigate_to_page(target_page, true, false)
+end
+
 --- Calculate and navigate to the current page based on cursor position.
 ---@param force? boolean
 ---@param preserve_clicks? boolean
@@ -365,6 +395,16 @@ local function cmd_clicks_decrement()
   update_clicks(-1)
 end
 
+--- Move to the next slide.
+local function cmd_next()
+  move_slide(1)
+end
+
+--- Move to the previous slide.
+local function cmd_previous()
+  move_slide(-1)
+end
+
 --- Show current status.
 local function cmd_status()
   local parts = {}
@@ -404,6 +444,8 @@ function M.setup(opts)
     cmd_clicks_decrement,
     { desc = "Decrement clicks for current Slidev preview page" }
   )
+  vim.api.nvim_create_user_command("SlidevPreviewNext", cmd_next, { desc = "Move to next Slidev preview page" })
+  vim.api.nvim_create_user_command("SlidevPreviewPrevious", cmd_previous, { desc = "Move to previous Slidev preview page" })
   vim.api.nvim_create_user_command("SlidevPreviewStatus", cmd_status, { desc = "Show Slidev preview status" })
 
   -- Clean up on Neovim exit to prevent zombie processes

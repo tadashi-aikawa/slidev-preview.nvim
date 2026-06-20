@@ -248,6 +248,73 @@ test("extract slide lines ignores separators inside code blocks", function()
   assert_eq(slide2[2], "# Slide 2", "page 2 starts at real separator")
 end)
 
+print("")
+print("parser.get_slide_content_start_line")
+
+test("find content start after global frontmatter", function()
+  local lines = {
+    "---",           -- 1
+    "theme: default", -- 2
+    "---",           -- 3
+    "",              -- 4
+    "# Slide 1",    -- 5
+    "---",           -- 6
+    "",              -- 7
+    "# Slide 2",    -- 8
+  }
+
+  assert_eq(parser.get_slide_content_start_line(lines, 1), 5, "page 1 content starts after global frontmatter")
+  assert_eq(parser.get_slide_content_start_line(lines, 2), 8, "page 2 content starts after separator")
+end)
+
+test("find content start after per-slide frontmatter", function()
+  local lines = {
+    "# Slide 1",      -- 1
+    "---",             -- 2
+    "layout: center",  -- 3
+    "---",             -- 4
+    "",                -- 5
+    "# Slide 2",      -- 6
+  }
+
+  assert_eq(parser.get_slide_content_start_line(lines, 2), 6, "page 2 content starts after per-slide frontmatter")
+end)
+
+test("find content start ignores separators inside code blocks", function()
+  local lines = {
+    "# Slide 1",    -- 1
+    "```markdown",  -- 2
+    "---",          -- 3
+    "```",          -- 4
+    "---",          -- 5
+    "",             -- 6
+    "# Slide 2",   -- 7
+  }
+
+  assert_eq(parser.get_slide_content_start_line(lines, 2), 7, "page 2 starts at the real separator")
+end)
+
+test("find content start falls back for an empty slide", function()
+  local lines = {
+    "# Slide 1", -- 1
+    "---",       -- 2
+    "",          -- 3
+    "---",       -- 4
+    "# Slide 3", -- 5
+  }
+
+  assert_eq(parser.get_slide_content_start_line(lines, 2), 3, "empty page falls back within the slide range")
+end)
+
+test("find content start returns nil for out-of-range pages", function()
+  local lines = {
+    "# Slide 1",
+  }
+
+  assert_eq(parser.get_slide_content_start_line(lines, 0), nil, "page 0 does not exist")
+  assert_eq(parser.get_slide_content_start_line(lines, 2), nil, "page 2 does not exist")
+end)
+
 -- Summary
 print("")
 print(string.format("Results: %d passed, %d failed", passed, failed))
