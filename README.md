@@ -88,7 +88,7 @@ vim.keymap.set('n', '<leader>sm', '<cmd>SlidevPreviewControl<cr>', { desc = 'Sli
 
 ### Control mode
 
-Run `:SlidevPreviewControl` to enter a temporary control mode. By default, press `j` for next slide, `k` for previous slide, `gg` for the first slide, `G` for the last slide, `{count}G` for a numbered slide, `l` to move forward through clicks or slides, `h` to move backward through clicks or slides, and `q`, `<Esc>`, or `<C-c>` to exit.
+Run `:SlidevPreviewControl` to enter a temporary control mode. By default, press `j` for next slide, `k` for previous slide, `{count}j` or `{count}k` to move multiple slides, `gg` for the first slide, `G` for the last slide, `{count}G` for a numbered slide, `l` to move forward through clicks or slides, `h` to move backward through clicks or slides, and `q`, `<Esc>`, or `<C-c>` to exit. Count prefixes apply to the configured `next_slide`, `previous_slide`, and `last_slide` keys.
 
 You can replace any action keys in `opts.control.keys`:
 

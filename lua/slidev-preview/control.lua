@@ -108,6 +108,10 @@ function M.action_for_input(actions, first_key, read_key)
 
       if is_digit(next_key) then
         digits = digits .. next_key
+      elseif actions[next_key] == "next_slide" then
+        return "move_slide", { delta = tonumber(digits) }
+      elseif actions[next_key] == "previous_slide" then
+        return "move_slide", { delta = -tonumber(digits) }
       elseif actions[next_key] == "last_slide" then
         return "goto_slide", { page = tonumber(digits) }
       else

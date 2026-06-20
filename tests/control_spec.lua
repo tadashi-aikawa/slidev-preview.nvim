@@ -83,11 +83,57 @@ test("count before last slide key resolves to target page", function()
   assert_eq(opts.page, 15, "15G targets page 15")
 end)
 
+test("count before next and previous slide keys resolves to relative movement", function()
+  local actions = control.build_actions()
+  local action, opts = action_for_sequence(actions, { "5", "j" })
+
+  assert_eq(action, "move_slide", "5j = move slide")
+  assert_eq(opts.delta, 5, "5j moves forward 5 slides")
+
+  action, opts = action_for_sequence(actions, { "1", "5", "j" })
+
+  assert_eq(action, "move_slide", "15j = move slide")
+  assert_eq(opts.delta, 15, "15j moves forward 15 slides")
+
+  action, opts = action_for_sequence(actions, { "5", "k" })
+
+  assert_eq(action, "move_slide", "5k = move slide")
+  assert_eq(opts.delta, -5, "5k moves backward 5 slides")
+end)
+
+test("count before custom next and previous slide keys resolves to relative movement", function()
+  local actions = control.build_actions({
+    next_slide = { "n" },
+    previous_slide = { "p" },
+  })
+  local action, opts = action_for_sequence(actions, { "5", "n" })
+
+  assert_eq(action, "move_slide", "5n = move slide")
+  assert_eq(opts.delta, 5, "5n moves forward 5 slides")
+
+  action, opts = action_for_sequence(actions, { "5", "p" })
+
+  assert_eq(action, "move_slide", "5p = move slide")
+  assert_eq(opts.delta, -5, "5p moves backward 5 slides")
+end)
+
 test("count before unsupported action does not resolve", function()
   local actions = control.build_actions()
-  local action = action_for_sequence(actions, { "5", "j" })
+  local action = action_for_sequence(actions, { "5", "l" })
 
-  assert_eq(action, nil, "5j is unsupported")
+  assert_eq(action, nil, "5l is unsupported")
+
+  action = action_for_sequence(actions, { "5", "h" })
+
+  assert_eq(action, nil, "5h is unsupported")
+
+  action = action_for_sequence(actions, { "5", "q" })
+
+  assert_eq(action, nil, "5q is unsupported")
+
+  action = action_for_sequence(actions, { "5", "g", "g" })
+
+  assert_eq(action, nil, "5gg is unsupported")
 end)
 
 test("forward uses clicks while there are remaining clicks", function()

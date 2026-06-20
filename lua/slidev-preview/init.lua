@@ -505,6 +505,8 @@ local function handle_control_action(action, opts)
     end
   elseif action == "goto_slide" and opts and opts.page then
     move_to_page(opts.page)
+  elseif action == "move_slide" and opts and opts.delta then
+    move_slide(opts.delta)
   elseif action == "forward" then
     control_forward()
   elseif action == "backward" then
