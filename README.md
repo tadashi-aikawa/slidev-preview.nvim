@@ -40,6 +40,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
     port = 3030,               -- Slidev dev server port
     debounce_ms = 200,         -- Cursor debounce interval (ms)
     slidev_bin = 'npx slidev', -- Command to run Slidev
+    slide_position = 'zz',     -- Cursor screen position after slide navigation: 'zt', 'zz', or 'zb'
     control = {
       keys = {
         next_slide = { 'j' },

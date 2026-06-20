@@ -10,6 +10,7 @@ local config = {
   port = 3030,
   debounce_ms = 200,
   slidev_bin = "npx slidev",
+  slide_position = "zz",
   control = {
     keys = nil,
   },
@@ -78,6 +79,17 @@ local function estimate_clicks_total(page)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local slide_lines = parser.get_slide_lines(lines, page)
   return clicks.estimate_total(slide_lines)
+end
+
+--- Resolve the normal-mode command used after moving to another slide.
+---@return string
+local function resolve_slide_position()
+  local slide_position = config.slide_position
+  if slide_position == "zt" or slide_position == "zz" or slide_position == "zb" then
+    return slide_position
+  end
+
+  return "zz"
 end
 
 --- Send navigation request to Slidev dev server.
@@ -203,7 +215,7 @@ local function move_slide(delta, opts)
   end
 
   vim.api.nvim_win_set_cursor(0, { target_line, 0 })
-  vim.cmd("normal! zt")
+  vim.cmd("normal! " .. resolve_slide_position())
 
   local initial_clicks = nil
   if opts and opts.enter_clicks == "max" then
