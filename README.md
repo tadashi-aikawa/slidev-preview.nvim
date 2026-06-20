@@ -7,6 +7,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 - 📍 Cursor position → slide page synchronization
 - 👆 Clicks increment/decrement commands for animations
 - 🎮 Control mode for repeated slide/click operations
+- 🪟 Winbar indicator showing the synced buffer and control-mode state
 - 🚀 Auto-start/stop Slidev dev server from Neovim
 - ⚡ Debounced cursor tracking (no lag, no spam)
 - 🧩 Frontmatter-aware slide parser (handles per-slide YAML frontmatter)
@@ -52,9 +53,64 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
         exit = { 'q', '<Esc>', '<C-c>' },
       },
     },
+    ui = {
+      winbar = true,             -- Show a winbar indicator on the synced buffer
+      icons = {
+        slide = 'page',         -- Icon shown before the page number
+        click = 'click',        -- Icon shown before the clicks (control mode)
+        control = '',           -- Icon shown before the CONTROL label
+      },
+    },
   },
 }
 ```
+
+### Winbar indicator
+
+When the preview is running, the synced buffer shows a winbar so you can tell at
+a glance that the buffer is being mirrored to the browser, and whether control
+mode is active. Normal mode shows just the page; control mode adds a `CONTROL`
+label and the current clicks:
+
+```
+  28              (normal: <slide icon> page)
+  CONTROL   28   1/2   (control mode: <control> CONTROL  <slide> page  <click> clicks)
+```
+
+The icons use Nerd Font glyphs by default; override `ui.icons` (set any to `''`
+to hide it) if your font differs. Set `ui.winbar = false` to disable the winbar
+entirely. The colors come from two highlight groups that you can override:
+
+```lua
+vim.api.nvim_set_hl(0, 'SlidevPreviewWinbar', { link = 'Comment' })   -- normal
+vim.api.nvim_set_hl(0, 'SlidevPreviewControl', { link = 'IncSearch' }) -- control mode
+```
+
+#### Using it with lualine
+
+If you use a winbar/statusline plugin such as
+[lualine](https://github.com/nvim-lualine/lualine.nvim), it manages the `winbar`
+option and overrides the one this plugin sets. Disable the built-in winbar and
+add `require('slidev-preview').winbar` as a lualine component instead:
+
+```lua
+require('slidev-preview').setup({
+  ui = { winbar = false }, -- let lualine own the winbar
+})
+
+require('lualine').setup({
+  winbar = {
+    lualine_c = { require('slidev-preview').winbar },
+  },
+  inactive_winbar = {
+    lualine_c = { require('slidev-preview').winbar },
+  },
+})
+```
+
+`require('slidev-preview').winbar` returns an empty string for any window that is
+not the synced Slidev buffer, so it stays out of the way elsewhere. It also works
+in lualine's `sections` (statusline) if you prefer it there.
 
 ## Usage
 
@@ -137,6 +193,7 @@ The plugin communicates with Slidev's built-in `vite-plugin-vue-server-ref` infr
 nvim --headless -l tests/control_spec.lua
 nvim --headless -l tests/parser_spec.lua
 nvim --headless -l tests/clicks_spec.lua
+nvim --headless -l tests/ui_spec.lua
 ```
 
 ## License

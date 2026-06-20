@@ -3,6 +3,7 @@ local http = require("slidev-preview.http")
 local server = require("slidev-preview.server")
 local clicks = require("slidev-preview.clicks")
 local control = require("slidev-preview.control")
+local ui = require("slidev-preview.ui")
 
 local M = {}
 
@@ -13,6 +14,14 @@ local config = {
   slide_position = "zz",
   control = {
     keys = nil,
+  },
+  ui = {
+    winbar = true,
+    icons = {
+      slide = "page",
+      click = "click",
+      control = "",
+    },
   },
 }
 
@@ -58,6 +67,111 @@ end
 local function is_active_slidev_file()
   local path = get_current_slidev_file()
   return path ~= nil and path == state.slides_path
+end
+
+local WINBAR_EXPR = "%{%v:lua.require'slidev-preview'.winbar()%}"
+
+--- Resolve the Slidev entrypoint path shown in a buffer, if any.
+---@param buf integer
+---@return string|nil
+local function buf_slidev_path(buf)
+  local name = vim.api.nvim_buf_get_name(buf)
+  if name == "" or not is_slidev_file(name) then
+    return nil
+  end
+  return vim.fn.fnamemodify(name, ":p")
+end
+
+--- Build the winbar snapshot for the buffer shown in `win` (0 = current window).
+---@param win integer
+---@return table
+local function build_winbar_snapshot(win)
+  local buf
+  if win ~= 0 and vim.api.nvim_win_is_valid(win) then
+    buf = vim.api.nvim_win_get_buf(win)
+  else
+    buf = vim.api.nvim_get_current_buf()
+  end
+
+  local active = state.slides_path ~= nil and buf_slidev_path(buf) == state.slides_path
+  return {
+    active = active,
+    control_active = state.control_active,
+    page = state.last_page,
+    clicks = state.clicks,
+    clicks_total = state.clicks_total,
+    icons = (config.ui and config.ui.icons) or {},
+  }
+end
+
+--- Winbar string for the synced buffer.
+---
+--- Usable both as the plugin's own winbar expression and as a lualine
+--- component. Honors `vim.g.actual_curwin` (set by lualine) so the right
+--- window's buffer is checked when rendering inactive winbars.
+---@return string
+function M.winbar()
+  local win = 0
+  local cur = vim.g.actual_curwin
+  if cur then
+    local w = tonumber(cur)
+    if w and vim.api.nvim_win_is_valid(w) then
+      win = w
+    end
+  end
+  return ui.winbar_text(build_winbar_snapshot(win))
+end
+
+--- Apply or clear the plugin winbar on a single window based on its buffer.
+---@param win? integer
+local function apply_winbar(win)
+  if not (config.ui and config.ui.winbar) then
+    return
+  end
+
+  win = win or vim.api.nvim_get_current_win()
+  if not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+
+  local buf = vim.api.nvim_win_get_buf(win)
+  local name = vim.api.nvim_buf_get_name(buf)
+  local is_sync = name ~= ""
+    and is_slidev_file(name)
+    and state.slides_path ~= nil
+    and vim.fn.fnamemodify(name, ":p") == state.slides_path
+
+  local current = vim.api.nvim_get_option_value("winbar", { scope = "local", win = win })
+  if is_sync then
+    if current ~= WINBAR_EXPR then
+      vim.api.nvim_set_option_value("winbar", WINBAR_EXPR, { scope = "local", win = win })
+    end
+  elseif current == WINBAR_EXPR then
+    vim.api.nvim_set_option_value("winbar", "", { scope = "local", win = win })
+  end
+end
+
+--- Remove the plugin winbar from every window it set it on.
+local function clear_all_winbar()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local ok, current = pcall(vim.api.nvim_get_option_value, "winbar", { scope = "local", win = win })
+    if ok and current == WINBAR_EXPR then
+      vim.api.nvim_set_option_value("winbar", "", { scope = "local", win = win })
+    end
+  end
+end
+
+local function refresh_statusline()
+  pcall(vim.cmd, "redrawstatus!")
+
+  local ok, lualine = pcall(require, "lualine")
+  if ok and type(lualine.refresh) == "function" then
+    pcall(lualine.refresh, {
+      force = true,
+      scope = "tabpage",
+      place = { "statusline", "winbar" },
+    })
+  end
 end
 
 --- Calculate the current page based on cursor position.
@@ -110,6 +224,7 @@ local function navigate_to_page(page, force, preserve_clicks, initial_clicks)
     state.clicks = clicks.resolve_for_navigation(state.clicks, state.last_page, page, preserve_clicks)
   end
   state.last_page = page
+  refresh_statusline()
 
   local payload
   if preserve_clicks and is_same_page then
@@ -186,6 +301,7 @@ local function update_clicks(delta)
   state.clicks_total = estimate_clicks_total(page) or state.clicks_total
   state.clicks = clicks.apply_delta(state.clicks, delta, state.clicks_total)
   send_clicks_patch(page)
+  refresh_statusline()
 end
 
 ---@return string[]|nil
@@ -296,8 +412,15 @@ local function enable_tracking()
     pattern = { "slide.md", "slides.md" },
     callback = sync_after_write,
   })
+  vim.api.nvim_create_autocmd({ "BufWinEnter", "WinEnter", "BufEnter" }, {
+    group = state.augroup,
+    callback = function()
+      apply_winbar(vim.api.nvim_get_current_win())
+    end,
+  })
 
   state.enabled = true
+  apply_winbar(vim.api.nvim_get_current_win())
 end
 
 --- Disable cursor tracking autocmds.
@@ -310,6 +433,8 @@ local function disable_tracking()
     vim.api.nvim_del_augroup_by_id(state.augroup)
     state.augroup = nil
   end
+
+  clear_all_winbar()
 
   if state.debounce_timer then
     state.debounce_timer:stop()
@@ -515,6 +640,9 @@ local function handle_control_action(action, opts)
 end
 
 local function redraw_control()
+  -- Force statusline/winbar re-evaluation before flushing the screen so
+  -- external bars (e.g. lualine) reflect control mode during getcharstr().
+  refresh_statusline()
   if vim.api.nvim__redraw then
     vim.api.nvim__redraw({ cursor = true, flush = true })
   else
@@ -554,12 +682,12 @@ local function cmd_control()
   end
 
   state.control_active = true
-  vim.notify("[slidev-preview] Control mode started")
+  redraw_control()
 
   local ok, err = pcall(run_control_loop, control.build_actions(config.control and config.control.keys or nil))
 
   state.control_active = false
-  vim.notify("[slidev-preview] Control mode ended")
+  redraw_control()
 
   if not ok then
     vim.notify("[slidev-preview] Control mode aborted: " .. tostring(err), vim.log.levels.ERROR)
@@ -589,6 +717,9 @@ end
 ---@param opts? table
 function M.setup(opts)
   config = vim.tbl_deep_extend("force", config, opts or {})
+
+  vim.api.nvim_set_hl(0, "SlidevPreviewWinbar", { default = true, link = "Comment" })
+  vim.api.nvim_set_hl(0, "SlidevPreviewControl", { default = true, link = "IncSearch" })
 
   vim.api.nvim_create_user_command("SlidevPreviewStart", cmd_start, { desc = "Start Slidev preview server" })
   vim.api.nvim_create_user_command("SlidevPreviewStartAndOpen", cmd_start_and_open, { desc = "Start Slidev preview server and open browser" })
