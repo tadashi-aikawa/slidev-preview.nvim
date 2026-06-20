@@ -45,6 +45,8 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
       keys = {
         next_slide = { 'j' },
         previous_slide = { 'k' },
+        first_slide = { 'gg' },
+        last_slide = { 'G' },
         forward = { 'l' },
         backward = { 'h' },
         exit = { 'q', '<Esc>', '<C-c>' },
@@ -86,7 +88,7 @@ vim.keymap.set('n', '<leader>sm', '<cmd>SlidevPreviewControl<cr>', { desc = 'Sli
 
 ### Control mode
 
-Run `:SlidevPreviewControl` to enter a temporary control mode. By default, press `j` for next slide, `k` for previous slide, `l` to move forward through clicks or slides, `h` to move backward through clicks or slides, and `q`, `<Esc>`, or `<C-c>` to exit.
+Run `:SlidevPreviewControl` to enter a temporary control mode. By default, press `j` for next slide, `k` for previous slide, `gg` for the first slide, `G` for the last slide, `{count}G` for a numbered slide, `l` to move forward through clicks or slides, `h` to move backward through clicks or slides, and `q`, `<Esc>`, or `<C-c>` to exit.
 
 You can replace any action keys in `opts.control.keys`:
 
@@ -96,6 +98,8 @@ require('slidev-preview').setup({
     keys = {
       next_slide = { '<Down>' },
       previous_slide = { '<Up>' },
+      first_slide = { 'gg' },
+      last_slide = { 'G' },
       forward = { '<Right>' },
       backward = { '<Left>' },
       exit = { 'q', '<Esc>' },
@@ -130,6 +134,7 @@ The plugin communicates with Slidev's built-in `vite-plugin-vue-server-ref` infr
 ## Testing
 
 ```bash
+nvim --headless -l tests/control_spec.lua
 nvim --headless -l tests/parser_spec.lua
 nvim --headless -l tests/clicks_spec.lua
 ```

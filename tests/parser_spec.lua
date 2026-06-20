@@ -204,6 +204,54 @@ test("frontmatter with empty lines inside", function()
 end)
 
 print("")
+print("parser.get_slide_count")
+
+test("count slides with global and per-slide frontmatter", function()
+  local lines = {
+    "---",
+    "theme: seriph",
+    "---",
+    "",
+    "# Slide 1",
+    "",
+    "---",
+    "layout: center",
+    "---",
+    "",
+    "# Slide 2",
+    "",
+    "---",
+    "",
+    "# Slide 3",
+  }
+
+  assert_eq(parser.get_slide_count(lines), 3, "counts three slides")
+end)
+
+test("count slides ignores separators inside code blocks", function()
+  local lines = {
+    "# Slide 1",
+    "",
+    "```markdown",
+    "---",
+    "some: yaml",
+    "---",
+    "```",
+    "",
+    "---",
+    "",
+    "# Slide 2",
+  }
+
+  assert_eq(parser.get_slide_count(lines), 2, "code block separators are ignored")
+end)
+
+test("count single and empty files as one slide", function()
+  assert_eq(parser.get_slide_count({ "# Only Slide" }), 1, "single slide = 1")
+  assert_eq(parser.get_slide_count({ "" }), 1, "empty file = 1")
+end)
+
+print("")
 print("parser.get_slide_lines")
 
 test("extract slide lines by page", function()

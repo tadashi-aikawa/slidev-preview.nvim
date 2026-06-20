@@ -188,27 +188,34 @@ local function update_clicks(delta)
   send_clicks_patch(page)
 end
 
---- Move the cursor to another slide and navigate the preview.
----@param delta integer
----@param opts? table
-local function move_slide(delta, opts)
+---@return string[]|nil
+local function get_active_slide_lines()
   if not state.slides_path then
     vim.notify(
       "[slidev-preview] Preview page is not available. Run :SlidevPreviewOpen or :SlidevPreviewStart first",
       vim.log.levels.WARN
     )
-    return
+    return nil
   end
 
   if not is_active_slidev_file() then
     vim.notify("[slidev-preview] Current buffer is not the started Slidev file", vim.log.levels.WARN)
+    return nil
+  end
+
+  return vim.api.nvim_buf_get_lines(0, 0, -1, false)
+end
+
+--- Move the cursor to a slide and navigate the preview.
+---@param target_page integer
+---@param opts? table
+---@param lines? string[]
+local function move_to_page(target_page, opts, lines)
+  lines = lines or get_active_slide_lines()
+  if not lines then
     return
   end
 
-  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
-  local current_page = parser.get_page_at_line(lines, cursor_line)
-  local target_page = current_page + delta
   local target_line = parser.get_slide_content_start_line(lines, target_page)
   if not target_line then
     return
@@ -223,6 +230,20 @@ local function move_slide(delta, opts)
   end
 
   navigate_to_page(target_page, true, false, initial_clicks)
+end
+
+--- Move the cursor to another slide and navigate the preview.
+---@param delta integer
+---@param opts? table
+local function move_slide(delta, opts)
+  local lines = get_active_slide_lines()
+  if not lines then
+    return
+  end
+
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local current_page = parser.get_page_at_line(lines, cursor_line)
+  move_to_page(current_page + delta, opts, lines)
 end
 
 --- Calculate and navigate to the current page based on cursor position.
@@ -470,11 +491,20 @@ local function control_backward()
   end
 end
 
-local function handle_control_action(action)
+local function handle_control_action(action, opts)
   if action == "next_slide" then
     move_slide(1)
   elseif action == "previous_slide" then
     move_slide(-1)
+  elseif action == "first_slide" then
+    move_to_page(1)
+  elseif action == "last_slide" then
+    local lines = get_active_slide_lines()
+    if lines then
+      move_to_page(parser.get_slide_count(lines), nil, lines)
+    end
+  elseif action == "goto_slide" and opts and opts.page then
+    move_to_page(opts.page)
   elseif action == "forward" then
     control_forward()
   elseif action == "backward" then
@@ -497,12 +527,18 @@ local function run_control_loop(actions)
       return
     end
 
-    local action = control.action_for_key(actions, key)
+    local action, action_opts = control.action_for_input(actions, key, function()
+      local read_ok, next_key = pcall(vim.fn.getcharstr)
+      if not read_ok then
+        return nil
+      end
+      return next_key
+    end)
     if action == "exit" then
       return
     end
     if action then
-      handle_control_action(action)
+      handle_control_action(action, action_opts)
       redraw_control()
     end
   end

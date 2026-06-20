@@ -27,6 +27,14 @@ local function keycode(key)
   return vim.api.nvim_replace_termcodes(key, true, true, true)
 end
 
+local function action_for_sequence(actions, keys)
+  local index = 1
+  return control.action_for_input(actions, keys[1], function()
+    index = index + 1
+    return keys[index]
+  end)
+end
+
 print("control")
 
 test("default keys map to actions", function()
@@ -34,6 +42,7 @@ test("default keys map to actions", function()
 
   assert_eq(control.action_for_key(actions, "j"), "next_slide", "j = next slide")
   assert_eq(control.action_for_key(actions, "k"), "previous_slide", "k = previous slide")
+  assert_eq(control.action_for_key(actions, "G"), "last_slide", "G = last slide")
   assert_eq(control.action_for_key(actions, "l"), "forward", "l = forward")
   assert_eq(control.action_for_key(actions, "h"), "backward", "h = backward")
   assert_eq(control.action_for_key(actions, "q"), "exit", "q = exit")
@@ -52,6 +61,33 @@ test("configured action keys replace that action only", function()
   assert_eq(control.action_for_key(actions, "k"), "previous_slide", "unspecified previous slide key keeps default")
   assert_eq(control.action_for_key(actions, "x"), "exit", "custom exit key works")
   assert_eq(control.action_for_key(actions, "q"), nil, "default exit key is replaced")
+end)
+
+test("multi-key first slide sequence resolves to action", function()
+  local actions = control.build_actions()
+  local action = action_for_sequence(actions, { "g", "g" })
+
+  assert_eq(action, "first_slide", "gg = first slide")
+end)
+
+test("count before last slide key resolves to target page", function()
+  local actions = control.build_actions()
+  local action, opts = action_for_sequence(actions, { "5", "G" })
+
+  assert_eq(action, "goto_slide", "5G = goto slide")
+  assert_eq(opts.page, 5, "5G targets page 5")
+
+  action, opts = action_for_sequence(actions, { "1", "5", "G" })
+
+  assert_eq(action, "goto_slide", "15G = goto slide")
+  assert_eq(opts.page, 15, "15G targets page 15")
+end)
+
+test("count before unsupported action does not resolve", function()
+  local actions = control.build_actions()
+  local action = action_for_sequence(actions, { "5", "j" })
+
+  assert_eq(action, nil, "5j is unsupported")
 end)
 
 test("forward uses clicks while there are remaining clicks", function()

@@ -123,6 +123,50 @@ function M.get_page_at_line(lines, cursor_line)
   return page
 end
 
+--- Count slides using the same separator rules as page detection.
+---@param lines string[] buffer lines (1-indexed)
+---@return integer slide_count
+function M.get_slide_count(lines)
+  local page = 1
+  local i = 1
+  local total = #lines
+
+  while i <= total do
+    local line = trim_end(lines[i])
+
+    if is_slide_separator(line) then
+      if i > 1 then
+        page = page + 1
+      end
+
+      local next_line = (i + 1 <= total) and lines[i + 1] or nil
+      if next_line and next_line:match("%S") then
+        i = i + 1
+        while i <= total do
+          local fline = trim_end(lines[i])
+          if fline == "---" then
+            break
+          end
+          i = i + 1
+        end
+      end
+    elseif line:match("^%s*```") then
+      local opening = line:match("^(%s*`+)")
+      i = i + 1
+      while i <= total do
+        if lines[i]:match("^" .. opening:gsub("(%W)", "%%%1")) then
+          break
+        end
+        i = i + 1
+      end
+    end
+
+    i = i + 1
+  end
+
+  return page
+end
+
 --- Extract the lines for a given slide page.
 ---@param lines string[] buffer lines (1-indexed)
 ---@param target_page integer 1-indexed page number
