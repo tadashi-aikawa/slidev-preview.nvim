@@ -19,6 +19,14 @@ local state = {
   root_dir = nil,
 }
 
+local function make_last_update()
+  return {
+    id = "neovim_slidev_preview",
+    type = "presenter",
+    time = math.floor(vim.uv.now()),
+  }
+end
+
 --- Return true if the path looks like a Slidev markdown entrypoint.
 ---@param path string
 ---@return boolean
@@ -46,31 +54,43 @@ end
 --- Send navigation request to Slidev dev server.
 ---@param page integer
 ---@param force? boolean
-local function navigate_to_page(page, force)
+---@param preserve_clicks? boolean
+local function navigate_to_page(page, force, preserve_clicks)
   if not force and page == state.last_page then
     return
   end
+
+  local is_same_page = page == state.last_page
   state.last_page = page
 
-  local body = vim.json.encode({
-    data = {
-      page = page,
-      clicks = 0,
-      clicksTotal = 0,
-      lastUpdate = {
-        id = "neovim_slidev_preview",
-        type = "presenter",
-        time = math.floor(vim.uv.now()),
+  local payload
+  if preserve_clicks and is_same_page then
+    payload = {
+      patch = {
+        page = page,
+        lastUpdate = make_last_update(),
       },
-    },
-  })
+    }
+  else
+    payload = {
+      data = {
+        page = page,
+        clicks = 0,
+        clicksTotal = 0,
+        lastUpdate = make_last_update(),
+      },
+    }
+  end
+
+  local body = vim.json.encode(payload)
 
   http.post("127.0.0.1", config.port, "/@server-reactive/nav", body)
 end
 
 --- Calculate and navigate to the current page based on cursor position.
 ---@param force? boolean
-local function sync_page(force)
+---@param preserve_clicks? boolean
+local function sync_page(force, preserve_clicks)
   if not is_active_slidev_file() then
     return
   end
@@ -78,7 +98,7 @@ local function sync_page(force)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
   local page = parser.get_page_at_line(lines, cursor_line)
-  navigate_to_page(page, force)
+  navigate_to_page(page, force, preserve_clicks)
 end
 
 --- Debounced sync: reset timer on each cursor move.
@@ -98,7 +118,7 @@ end
 --- Sync after Slidev reloads the saved file.
 local function sync_after_write()
   vim.defer_fn(function()
-    sync_page(true)
+    sync_page(true, true)
   end, config.debounce_ms)
 end
 
@@ -241,6 +261,7 @@ local function cmd_open()
   local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
   local page = parser.get_page_at_line(lines, cursor_line)
   server.open_browser(config.port, page)
+  state.last_page = page
   enable_tracking()
 end
 
