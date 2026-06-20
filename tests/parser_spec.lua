@@ -203,6 +203,51 @@ test("frontmatter with empty lines inside", function()
   assert_eq(parser.get_page_at_line(lines, 6), 1, "slide 1 = page 1")
 end)
 
+print("")
+print("parser.get_slide_lines")
+
+test("extract slide lines by page", function()
+  local lines = {
+    "---",           -- 1
+    "theme: default", -- 2
+    "---",           -- 3
+    "",
+    "# Slide 1",
+    "---",
+    "layout: center",
+    "---",
+    "# Slide 2",
+    "---",
+    "# Slide 3",
+  }
+
+  local slide1 = parser.get_slide_lines(lines, 1)
+  local slide2 = parser.get_slide_lines(lines, 2)
+  local slide3 = parser.get_slide_lines(lines, 3)
+
+  assert_eq(slide1[5], "# Slide 1", "page 1 includes first slide content")
+  assert_eq(#slide2, 4, "page 2 includes separator, frontmatter, and content")
+  assert_eq(slide2[4], "# Slide 2", "page 2 content is extracted")
+  assert_eq(slide3[2], "# Slide 3", "page 3 content is extracted")
+end)
+
+test("extract slide lines ignores separators inside code blocks", function()
+  local lines = {
+    "# Slide 1",
+    "```markdown",
+    "---",
+    "```",
+    "---",
+    "# Slide 2",
+  }
+
+  local slide1 = parser.get_slide_lines(lines, 1)
+  local slide2 = parser.get_slide_lines(lines, 2)
+
+  assert_eq(#slide1, 4, "page 1 includes code block separator")
+  assert_eq(slide2[2], "# Slide 2", "page 2 starts at real separator")
+end)
+
 -- Summary
 print("")
 print(string.format("Results: %d passed, %d failed", passed, failed))

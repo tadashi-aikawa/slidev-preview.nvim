@@ -1,6 +1,7 @@
 local parser = require("slidev-preview.parser")
 local http = require("slidev-preview.http")
 local server = require("slidev-preview.server")
+local clicks = require("slidev-preview.clicks")
 
 local M = {}
 
@@ -17,6 +18,8 @@ local state = {
   augroup = nil,
   slides_path = nil,
   root_dir = nil,
+  clicks = 0,
+  clicks_total = nil,
 }
 
 local function make_last_update()
@@ -51,6 +54,27 @@ local function is_active_slidev_file()
   return path ~= nil and path == state.slides_path
 end
 
+--- Calculate the current page based on cursor position.
+---@return integer
+local function get_current_page()
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  return parser.get_page_at_line(lines, cursor_line)
+end
+
+--- Estimate clicksTotal for a page from the active Slidev file.
+---@param page integer
+---@return integer|nil
+local function estimate_clicks_total(page)
+  if not is_active_slidev_file() then
+    return nil
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local slide_lines = parser.get_slide_lines(lines, page)
+  return clicks.estimate_total(slide_lines)
+end
+
 --- Send navigation request to Slidev dev server.
 ---@param page integer
 ---@param force? boolean
@@ -61,6 +85,8 @@ local function navigate_to_page(page, force, preserve_clicks)
   end
 
   local is_same_page = page == state.last_page
+  state.clicks_total = estimate_clicks_total(page)
+  state.clicks = clicks.resolve_for_navigation(state.clicks, state.last_page, page, preserve_clicks)
   state.last_page = page
 
   local payload
@@ -75,7 +101,7 @@ local function navigate_to_page(page, force, preserve_clicks)
     payload = {
       data = {
         page = page,
-        clicks = 0,
+        clicks = state.clicks,
         clicksTotal = 0,
         lastUpdate = make_last_update(),
       },
@@ -87,6 +113,59 @@ local function navigate_to_page(page, force, preserve_clicks)
   http.post("127.0.0.1", config.port, "/@server-reactive/nav", body)
 end
 
+--- Send clicks patch to Slidev dev server.
+---@param page integer
+local function send_clicks_patch(page)
+  local body = vim.json.encode({
+    patch = {
+      page = page,
+      clicks = state.clicks,
+      lastUpdate = make_last_update(),
+    },
+  })
+
+  http.post("127.0.0.1", config.port, "/@server-reactive/nav", body)
+end
+
+--- Resolve the page whose clicks should be updated.
+---@return integer|nil
+local function resolve_clicks_page()
+  if state.last_page then
+    return state.last_page
+  end
+
+  if not state.slides_path then
+    vim.notify(
+      "[slidev-preview] Preview page is not available. Run :SlidevPreviewOpen or :SlidevPreviewStart first",
+      vim.log.levels.WARN
+    )
+    return nil
+  end
+
+  if not is_active_slidev_file() then
+    vim.notify("[slidev-preview] Current buffer is not the started Slidev file", vim.log.levels.WARN)
+    return nil
+  end
+
+  local page = get_current_page()
+  state.last_page = page
+  state.clicks_total = estimate_clicks_total(page)
+  return page
+end
+
+--- Update clicks for the previewed page.
+---@param delta integer
+local function update_clicks(delta)
+  local page = resolve_clicks_page()
+  if not page then
+    return
+  end
+
+  state.clicks_total = estimate_clicks_total(page) or state.clicks_total
+  state.clicks = clicks.apply_delta(state.clicks, delta, state.clicks_total)
+  send_clicks_patch(page)
+end
+
 --- Calculate and navigate to the current page based on cursor position.
 ---@param force? boolean
 ---@param preserve_clicks? boolean
@@ -95,9 +174,7 @@ local function sync_page(force, preserve_clicks)
     return
   end
 
-  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
-  local page = parser.get_page_at_line(lines, cursor_line)
+  local page = get_current_page()
   navigate_to_page(page, force, preserve_clicks)
 end
 
@@ -164,6 +241,8 @@ local function disable_tracking()
 
   state.enabled = false
   state.last_page = nil
+  state.clicks = 0
+  state.clicks_total = nil
 end
 
 --- Start preview: launch dev server and optionally open browser.
@@ -188,6 +267,9 @@ local function start_preview(open_browser)
 
   state.slides_path = slides_path
   state.root_dir = vim.fn.fnamemodify(slides_path, ":h")
+  state.last_page = nil
+  state.clicks = 0
+  state.clicks_total = nil
 
   local started = server.start({
     port = config.port,
@@ -198,6 +280,8 @@ local function start_preview(open_browser)
   if not started then
     state.slides_path = nil
     state.root_dir = nil
+    state.clicks = 0
+    state.clicks_total = nil
     return
   end
   enable_tracking()
@@ -219,6 +303,9 @@ local function cmd_stop()
   server.stop()
   state.slides_path = nil
   state.root_dir = nil
+  state.last_page = nil
+  state.clicks = 0
+  state.clicks_total = nil
 end
 
 --- Restart preview: stop dev server if running, then start again without opening browser.
@@ -234,6 +321,9 @@ local function cmd_restart()
     server.stop()
     state.slides_path = nil
     state.root_dir = nil
+    state.last_page = nil
+    state.clicks = 0
+    state.clicks_total = nil
   end
 
   start_preview(false)
@@ -257,12 +347,22 @@ local function cmd_open()
     state.root_dir = vim.fn.fnamemodify(slides_path, ":h")
   end
 
-  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
-  local page = parser.get_page_at_line(lines, cursor_line)
+  local page = get_current_page()
   server.open_browser(config.port, page)
   state.last_page = page
+  state.clicks = 0
+  state.clicks_total = estimate_clicks_total(page)
   enable_tracking()
+end
+
+--- Increment clicks for the previewed page.
+local function cmd_clicks_increment()
+  update_clicks(1)
+end
+
+--- Decrement clicks for the previewed page.
+local function cmd_clicks_decrement()
+  update_clicks(-1)
 end
 
 --- Show current status.
@@ -277,6 +377,10 @@ local function cmd_status()
   if state.last_page then
     table.insert(parts, "Page: " .. state.last_page)
   end
+  table.insert(parts, "Clicks: " .. state.clicks)
+  if state.clicks_total then
+    table.insert(parts, "ClicksTotal: " .. state.clicks_total)
+  end
   vim.notify("[slidev-preview] " .. table.concat(parts, " | "))
 end
 
@@ -290,6 +394,16 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("SlidevPreviewStop", cmd_stop, { desc = "Stop Slidev preview" })
   vim.api.nvim_create_user_command("SlidevPreviewRestart", cmd_restart, { desc = "Restart Slidev preview server" })
   vim.api.nvim_create_user_command("SlidevPreviewOpen", cmd_open, { desc = "Open browser to current slide" })
+  vim.api.nvim_create_user_command(
+    "SlidevPreviewClicksIncrement",
+    cmd_clicks_increment,
+    { desc = "Increment clicks for current Slidev preview page" }
+  )
+  vim.api.nvim_create_user_command(
+    "SlidevPreviewClicksDecrement",
+    cmd_clicks_decrement,
+    { desc = "Decrement clicks for current Slidev preview page" }
+  )
   vim.api.nvim_create_user_command("SlidevPreviewStatus", cmd_status, { desc = "Show Slidev preview status" })
 
   -- Clean up on Neovim exit to prevent zombie processes

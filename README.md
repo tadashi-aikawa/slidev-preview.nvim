@@ -5,6 +5,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 ## Features
 
 - 📍 Cursor position → slide page synchronization
+- 👆 Clicks increment/decrement commands for animations
 - 🚀 Auto-start/stop Slidev dev server from Neovim
 - ⚡ Debounced cursor tracking (no lag, no spam)
 - 🧩 Frontmatter-aware slide parser (handles per-slide YAML frontmatter)
@@ -53,7 +54,18 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 | `:SlidevPreviewStop` | Stop the dev server and disable cursor sync. |
 | `:SlidevPreviewRestart` | Restart the dev server without opening browser. Enables cursor sync. |
 | `:SlidevPreviewOpen` | Open browser to the current slide (server must be running). |
+| `:SlidevPreviewClicksIncrement` | Increment clicks for the previewed slide. |
+| `:SlidevPreviewClicksDecrement` | Decrement clicks for the previewed slide. |
 | `:SlidevPreviewStatus` | Show current status (server, port, tracking, page). |
+
+### Keymaps
+
+The plugin does not set default keymaps. Assign the clicks commands to any keys you prefer:
+
+```lua
+vim.keymap.set('n', '<leader>sj', '<cmd>SlidevPreviewClicksIncrement<cr>', { desc = 'Slidev clicks +1' })
+vim.keymap.set('n', '<leader>sk', '<cmd>SlidevPreviewClicksDecrement<cr>', { desc = 'Slidev clicks -1' })
+```
 
 ### Workflow
 
@@ -82,6 +94,7 @@ The plugin communicates with Slidev's built-in `vite-plugin-vue-server-ref` infr
 
 ```bash
 nvim --headless -l tests/parser_spec.lua
+nvim --headless -l tests/clicks_spec.lua
 ```
 
 ## License
