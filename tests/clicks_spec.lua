@@ -96,6 +96,52 @@ test("estimate total ignores code blocks", function()
   assert_eq(clicks.estimate_total(lines), 1, "v-click inside code block is ignored")
 end)
 
+test("estimate total counts v-clicks list items", function()
+  local lines = {
+    "<v-clicks>",
+    "",
+    "- Item 1",
+    "- Item 2",
+    "- Item 3",
+    "",
+    "</v-clicks>",
+  }
+
+  assert_eq(clicks.estimate_total(lines), 3, "three v-clicks list items = clicksTotal 3")
+end)
+
+test("estimate total respects v-clicks depth", function()
+  local lines = {
+    '<v-clicks depth="2">',
+    "",
+    "- Item 1",
+    "  - Item 1.1",
+    "  - Item 1.2",
+    "- Item 2",
+    "  - Item 2.1",
+    "  - Item 2.2",
+    "",
+    "</v-clicks>",
+  }
+
+  assert_eq(clicks.estimate_total(lines), 6, "depth 2 includes nested list items")
+end)
+
+test("estimate total respects v-clicks every", function()
+  local lines = {
+    '<v-clicks every="2">',
+    "",
+    "- Item 1",
+    "- Item 2",
+    "- Item 3",
+    "- Item 4",
+    "",
+    "</v-clicks>",
+  }
+
+  assert_eq(clicks.estimate_total(lines), 2, "four items with every 2 = clicksTotal 2")
+end)
+
 print("")
 print(string.format("Results: %d passed, %d failed", passed, failed))
 if failed > 0 then

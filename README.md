@@ -6,6 +6,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 
 - 📍 Cursor position → slide page synchronization
 - 👆 Clicks increment/decrement commands for animations
+- 🎮 Control mode for repeated slide/click operations
 - 🚀 Auto-start/stop Slidev dev server from Neovim
 - ⚡ Debounced cursor tracking (no lag, no spam)
 - 🧩 Frontmatter-aware slide parser (handles per-slide YAML frontmatter)
@@ -39,6 +40,15 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
     port = 3030,               -- Slidev dev server port
     debounce_ms = 200,         -- Cursor debounce interval (ms)
     slidev_bin = 'npx slidev', -- Command to run Slidev
+    control = {
+      keys = {
+        next_slide = { 'j' },
+        previous_slide = { 'k' },
+        forward = { 'l' },
+        backward = { 'h' },
+        exit = { 'q', '<Esc>', '<C-c>' },
+      },
+    },
   },
 }
 ```
@@ -58,6 +68,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 | `:SlidevPreviewClicksDecrement` | Decrement clicks for the previewed slide. |
 | `:SlidevPreviewNext` | Move to the next slide and sync the Neovim cursor. |
 | `:SlidevPreviewPrevious` | Move to the previous slide and sync the Neovim cursor. |
+| `:SlidevPreviewControl` | Enter control mode for repeated slide/click operations. |
 | `:SlidevPreviewStatus` | Show current status (server, port, tracking, page). |
 
 ### Keymaps
@@ -69,6 +80,27 @@ vim.keymap.set('n', '<leader>sj', '<cmd>SlidevPreviewClicksIncrement<cr>', { des
 vim.keymap.set('n', '<leader>sk', '<cmd>SlidevPreviewClicksDecrement<cr>', { desc = 'Slidev clicks -1' })
 vim.keymap.set('n', '<leader>sn', '<cmd>SlidevPreviewNext<cr>', { desc = 'Slidev next slide' })
 vim.keymap.set('n', '<leader>sp', '<cmd>SlidevPreviewPrevious<cr>', { desc = 'Slidev previous slide' })
+vim.keymap.set('n', '<leader>sm', '<cmd>SlidevPreviewControl<cr>', { desc = 'Slidev control mode' })
+```
+
+### Control mode
+
+Run `:SlidevPreviewControl` to enter a temporary control mode. By default, press `j` for next slide, `k` for previous slide, `l` to move forward through clicks or slides, `h` to move backward through clicks or slides, and `q`, `<Esc>`, or `<C-c>` to exit.
+
+You can replace any action keys in `opts.control.keys`:
+
+```lua
+require('slidev-preview').setup({
+  control = {
+    keys = {
+      next_slide = { '<Down>' },
+      previous_slide = { '<Up>' },
+      forward = { '<Right>' },
+      backward = { '<Left>' },
+      exit = { 'q', '<Esc>' },
+    },
+  },
+})
 ```
 
 ### Workflow

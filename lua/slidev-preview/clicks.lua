@@ -54,6 +54,35 @@ local function parse_at_value(raw)
   return max_value
 end
 
+local function parse_number_attr(line, name, default)
+  local raw = line:match(name .. "%s*=%s*[\"'](%d+)[\"']")
+  local value = raw and tonumber(raw) or nil
+  if value and value > 0 then
+    return value
+  end
+  return default
+end
+
+local function get_markdown_list_depth(line)
+  local indent, marker = line:match("^(%s*)([-*+]%s+)")
+  if not marker then
+    indent, marker = line:match("^(%s*)(%d+[.)]%s+)")
+  end
+  if not marker then
+    return nil
+  end
+
+  local spaces = indent:gsub("\t", "  "):len()
+  return math.floor(spaces / 2) + 1
+end
+
+local function clicks_for_v_clicks_block(item_count, every)
+  if item_count <= 0 then
+    return 0
+  end
+  return math.ceil(item_count / every)
+end
+
 --- Estimate Slidev clicksTotal from v-click directives in one slide.
 --- Returns nil when no supported click directive is found.
 ---@param lines string[]
@@ -64,6 +93,7 @@ function M.estimate_total(lines)
   local found = false
   local in_code_block = false
   local code_opening = nil
+  local v_clicks_block = nil
 
   for _, line in ipairs(lines) do
     if in_code_block then
@@ -71,9 +101,30 @@ function M.estimate_total(lines)
         in_code_block = false
         code_opening = nil
       end
+    elseif v_clicks_block then
+      if line:match("</v%-clicks>") then
+        local clicks_count = clicks_for_v_clicks_block(v_clicks_block.item_count, v_clicks_block.every)
+        if clicks_count > 0 then
+          found = true
+          offset = offset + clicks_count
+          total = math.max(total, offset)
+        end
+        v_clicks_block = nil
+      else
+        local depth = get_markdown_list_depth(line)
+        if depth and depth <= v_clicks_block.depth then
+          v_clicks_block.item_count = v_clicks_block.item_count + 1
+        end
+      end
     elseif line:match("^%s*```") then
       in_code_block = true
       code_opening = line:match("^(%s*`+)")
+    elseif line:match("<v%-clicks[%s>]") then
+      v_clicks_block = {
+        depth = parse_number_attr(line, "depth", 1),
+        every = parse_number_attr(line, "every", 1),
+        item_count = 0,
+      }
     else
       local pos = 1
       while true do
@@ -104,6 +155,15 @@ function M.estimate_total(lines)
 
         pos = end_pos + 1
       end
+    end
+  end
+
+  if v_clicks_block then
+    local clicks_count = clicks_for_v_clicks_block(v_clicks_block.item_count, v_clicks_block.every)
+    if clicks_count > 0 then
+      found = true
+      offset = offset + clicks_count
+      total = math.max(total, offset)
     end
   end
 

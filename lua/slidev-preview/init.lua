@@ -2,6 +2,7 @@ local parser = require("slidev-preview.parser")
 local http = require("slidev-preview.http")
 local server = require("slidev-preview.server")
 local clicks = require("slidev-preview.clicks")
+local control = require("slidev-preview.control")
 
 local M = {}
 
@@ -9,6 +10,9 @@ local config = {
   port = 3030,
   debounce_ms = 200,
   slidev_bin = "npx slidev",
+  control = {
+    keys = nil,
+  },
 }
 
 local state = {
@@ -20,6 +24,7 @@ local state = {
   root_dir = nil,
   clicks = 0,
   clicks_total = nil,
+  control_active = false,
 }
 
 local function make_last_update()
@@ -79,14 +84,19 @@ end
 ---@param page integer
 ---@param force? boolean
 ---@param preserve_clicks? boolean
-local function navigate_to_page(page, force, preserve_clicks)
+---@param initial_clicks? integer
+local function navigate_to_page(page, force, preserve_clicks, initial_clicks)
   if not force and page == state.last_page then
     return
   end
 
   local is_same_page = page == state.last_page
   state.clicks_total = estimate_clicks_total(page)
-  state.clicks = clicks.resolve_for_navigation(state.clicks, state.last_page, page, preserve_clicks)
+  if initial_clicks ~= nil then
+    state.clicks = initial_clicks
+  else
+    state.clicks = clicks.resolve_for_navigation(state.clicks, state.last_page, page, preserve_clicks)
+  end
   state.last_page = page
 
   local payload
@@ -168,7 +178,8 @@ end
 
 --- Move the cursor to another slide and navigate the preview.
 ---@param delta integer
-local function move_slide(delta)
+---@param opts? table
+local function move_slide(delta, opts)
   if not state.slides_path then
     vim.notify(
       "[slidev-preview] Preview page is not available. Run :SlidevPreviewOpen or :SlidevPreviewStart first",
@@ -193,7 +204,13 @@ local function move_slide(delta)
 
   vim.api.nvim_win_set_cursor(0, { target_line, 0 })
   vim.cmd("normal! zt")
-  navigate_to_page(target_page, true, false)
+
+  local initial_clicks = nil
+  if opts and opts.enter_clicks == "max" then
+    initial_clicks = control.resolve_previous_slide_clicks(estimate_clicks_total(target_page))
+  end
+
+  navigate_to_page(target_page, true, false, initial_clicks)
 end
 
 --- Calculate and navigate to the current page based on cursor position.
@@ -405,6 +422,100 @@ local function cmd_previous()
   move_slide(-1)
 end
 
+local function refresh_clicks_total()
+  local page = resolve_clicks_page()
+  if not page then
+    return false
+  end
+
+  state.clicks_total = estimate_clicks_total(page) or state.clicks_total
+  return true
+end
+
+local function control_forward()
+  if not refresh_clicks_total() then
+    return
+  end
+
+  local action = control.resolve_forward_action(state.clicks, state.clicks_total)
+  if action == "clicks_increment" then
+    update_clicks(1)
+  else
+    move_slide(1)
+  end
+end
+
+local function control_backward()
+  if not refresh_clicks_total() then
+    return
+  end
+
+  local action = control.resolve_backward_action(state.clicks)
+  if action == "clicks_decrement" then
+    update_clicks(-1)
+  else
+    move_slide(-1, { enter_clicks = "max" })
+  end
+end
+
+local function handle_control_action(action)
+  if action == "next_slide" then
+    move_slide(1)
+  elseif action == "previous_slide" then
+    move_slide(-1)
+  elseif action == "forward" then
+    control_forward()
+  elseif action == "backward" then
+    control_backward()
+  end
+end
+
+local function redraw_control()
+  if vim.api.nvim__redraw then
+    vim.api.nvim__redraw({ cursor = true, flush = true })
+  else
+    vim.cmd("redraw")
+  end
+end
+
+local function run_control_loop(actions)
+  while true do
+    local ok, key = pcall(vim.fn.getcharstr)
+    if not ok or key == "" then
+      return
+    end
+
+    local action = control.action_for_key(actions, key)
+    if action == "exit" then
+      return
+    end
+    if action then
+      handle_control_action(action)
+      redraw_control()
+    end
+  end
+end
+
+--- Enter Slidev control mode.
+local function cmd_control()
+  if state.control_active then
+    vim.notify("[slidev-preview] Control mode is already active", vim.log.levels.WARN)
+    return
+  end
+
+  state.control_active = true
+  vim.notify("[slidev-preview] Control mode started")
+
+  local ok, err = pcall(run_control_loop, control.build_actions(config.control and config.control.keys or nil))
+
+  state.control_active = false
+  vim.notify("[slidev-preview] Control mode ended")
+
+  if not ok then
+    vim.notify("[slidev-preview] Control mode aborted: " .. tostring(err), vim.log.levels.ERROR)
+  end
+end
+
 --- Show current status.
 local function cmd_status()
   local parts = {}
@@ -446,6 +557,7 @@ function M.setup(opts)
   )
   vim.api.nvim_create_user_command("SlidevPreviewNext", cmd_next, { desc = "Move to next Slidev preview page" })
   vim.api.nvim_create_user_command("SlidevPreviewPrevious", cmd_previous, { desc = "Move to previous Slidev preview page" })
+  vim.api.nvim_create_user_command("SlidevPreviewControl", cmd_control, { desc = "Enter Slidev preview control mode" })
   vim.api.nvim_create_user_command("SlidevPreviewStatus", cmd_status, { desc = "Show Slidev preview status" })
 
   -- Clean up on Neovim exit to prevent zombie processes
