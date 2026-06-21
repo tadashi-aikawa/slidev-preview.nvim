@@ -19,7 +19,7 @@ end
 ---
 --- Normal mode shows only the page. Control mode additionally shows a
 --- `CONTROL` label and the current clicks.
----@param snapshot table|nil { active, control_active, page, clicks, clicks_total, icons }
+---@param snapshot table|nil { active, control_active, page, pages_total, clicks, clicks_total, icons }
 ---@return string
 function M.winbar_text(snapshot)
   if not snapshot or not snapshot.active then
@@ -27,13 +27,23 @@ function M.winbar_text(snapshot)
   end
 
   local icons = snapshot.icons or {}
-  local page = snapshot.page and tostring(snapshot.page) or "-"
+  local page
+  if snapshot.page then
+    if snapshot.pages_total then
+      page = string.format("%d/%d", snapshot.page, snapshot.pages_total)
+    else
+      page = tostring(snapshot.page)
+    end
+  else
+    page = "-"
+  end
 
   if snapshot.control_active then
-    local parts = {
-      with_icon(icons.control, "CONTROL"),
-      with_icon(icons.slide, page),
-    }
+    local parts = {}
+    if icons.control and icons.control ~= "" then
+      table.insert(parts, icons.control)
+    end
+    table.insert(parts, with_icon(icons.slide, page))
     if snapshot.clicks_total and snapshot.clicks_total > 0 then
       local clicks = string.format("%d/%d", snapshot.clicks or 0, snapshot.clicks_total)
       table.insert(parts, with_icon(icons.click, clicks))

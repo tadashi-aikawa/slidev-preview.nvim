@@ -20,7 +20,7 @@ local config = {
     icons = {
       slide = "page",
       click = "click",
-      control = "",
+      control = "control",
     },
   },
 }
@@ -34,6 +34,7 @@ local state = {
   root_dir = nil,
   clicks = 0,
   clicks_total = nil,
+  pages_total = nil,
   control_active = false,
 }
 
@@ -100,6 +101,7 @@ local function build_winbar_snapshot(win)
     page = state.last_page,
     clicks = state.clicks,
     clicks_total = state.clicks_total,
+    pages_total = state.pages_total,
     icons = (config.ui and config.ui.icons) or {},
   }
 end
@@ -195,6 +197,17 @@ local function estimate_clicks_total(page)
   return clicks.estimate_total(slide_lines)
 end
 
+--- Get the total slide count from the active Slidev file.
+---@return integer|nil
+local function get_pages_total()
+  if not is_active_slidev_file() then
+    return nil
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  return parser.get_slide_count(lines)
+end
+
 --- Resolve the normal-mode command used after moving to another slide.
 ---@return string
 local function resolve_slide_position()
@@ -218,6 +231,7 @@ local function navigate_to_page(page, force, preserve_clicks, initial_clicks)
 
   local is_same_page = page == state.last_page
   state.clicks_total = estimate_clicks_total(page)
+  state.pages_total = get_pages_total()
   if initial_clicks ~= nil then
     state.clicks = initial_clicks
   else
@@ -287,6 +301,7 @@ local function resolve_clicks_page()
   local page = get_current_page()
   state.last_page = page
   state.clicks_total = estimate_clicks_total(page)
+  state.pages_total = get_pages_total()
   return page
 end
 
@@ -299,6 +314,7 @@ local function update_clicks(delta)
   end
 
   state.clicks_total = estimate_clicks_total(page) or state.clicks_total
+  state.pages_total = get_pages_total() or state.pages_total
   state.clicks = clicks.apply_delta(state.clicks, delta, state.clicks_total)
   send_clicks_patch(page)
   refresh_statusline()
@@ -511,6 +527,7 @@ local function cmd_stop()
   state.last_page = nil
   state.clicks = 0
   state.clicks_total = nil
+  state.pages_total = nil
 end
 
 --- Restart preview: stop dev server if running, then start again without opening browser.
@@ -529,6 +546,7 @@ local function cmd_restart()
     state.last_page = nil
     state.clicks = 0
     state.clicks_total = nil
+    state.pages_total = nil
   end
 
   start_preview(false)
@@ -557,6 +575,7 @@ local function cmd_open()
   state.last_page = page
   state.clicks = 0
   state.clicks_total = estimate_clicks_total(page)
+  state.pages_total = get_pages_total()
   enable_tracking()
 end
 
@@ -587,6 +606,7 @@ local function refresh_clicks_total()
   end
 
   state.clicks_total = estimate_clicks_total(page) or state.clicks_total
+  state.pages_total = get_pages_total() or state.pages_total
   return true
 end
 
@@ -718,7 +738,7 @@ end
 function M.setup(opts)
   config = vim.tbl_deep_extend("force", config, opts or {})
 
-  vim.api.nvim_set_hl(0, "SlidevPreviewWinbar", { default = true, link = "Comment" })
+  vim.api.nvim_set_hl(0, "SlidevPreviewWinbar", { default = true, link = "WinBar" })
   vim.api.nvim_set_hl(0, "SlidevPreviewControl", { default = true, link = "IncSearch" })
 
   vim.api.nvim_create_user_command("SlidevPreviewStart", cmd_start, { desc = "Start Slidev preview server" })

@@ -65,7 +65,19 @@ test("normal mode works without an icon", function()
   assert_contains(text, " 5 ", "shows just the page when no icon is set")
 end)
 
-test("control mode shows CONTROL, page, and clicks", function()
+test("normal mode shows page/total when pages_total is provided", function()
+  local text = ui.winbar_text({
+    active = true,
+    control_active = false,
+    page = 3,
+    pages_total = 10,
+    icons = { slide = "S" },
+  })
+  assert_contains(text, "S 3/10", "shows page fraction with icon")
+  assert_not_contains(text, "CONTROL", "no control label in normal mode")
+end)
+
+test("control mode shows control icon, page, and clicks", function()
   local text = ui.winbar_text({
     active = true,
     control_active = true,
@@ -75,7 +87,8 @@ test("control mode shows CONTROL, page, and clicks", function()
     icons = { slide = "S", click = "C", control = "G" },
   })
   assert_contains(text, "SlidevPreviewControl", "uses the control highlight group")
-  assert_contains(text, "G CONTROL", "shows the control icon and label")
+  assert_contains(text, "G", "shows the control icon")
+  assert_not_contains(text, "CONTROL", "no CONTROL label text")
   assert_contains(text, "S 28", "shows the page")
   assert_contains(text, "C 1/2", "shows the clicks with icon")
 end)
@@ -88,7 +101,6 @@ test("control mode omits clicks when no clicks_total", function()
     clicks = 0,
     clicks_total = 0,
   })
-  assert_contains(text, "CONTROL", "still shows control label")
   assert_contains(text, "3", "still shows page")
   assert_not_contains(text, "/", "no clicks counter when total is 0")
 end)

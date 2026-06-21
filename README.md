@@ -58,7 +58,7 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
       icons = {
         slide = 'page',         -- Icon shown before the page number
         click = 'click',        -- Icon shown before the clicks (control mode)
-        control = '',           -- Icon shown before the CONTROL label
+        control = 'control',    -- Icon shown in control mode
       },
     },
   },
@@ -69,12 +69,12 @@ Neovim plugin that syncs your Slidev presentation in the browser with your curso
 
 When the preview is running, the synced buffer shows a winbar so you can tell at
 a glance that the buffer is being mirrored to the browser, and whether control
-mode is active. Normal mode shows just the page; control mode adds a `CONTROL`
-label and the current clicks:
+mode is active. Normal mode shows the page number with a total; control mode
+prepends the control icon and adds the current clicks:
 
 ```
-  28              (normal: <slide icon> page)
-  CONTROL   28   1/2   (control mode: <control> CONTROL  <slide> page  <click> clicks)
+  3/10              (normal: <slide icon> page/total)
+  control   3/10   1/2   (control mode: <control icon>  <slide> page/total  <click> clicks)
 ```
 
 The icons use Nerd Font glyphs by default; override `ui.icons` (set any to `''`
@@ -82,7 +82,7 @@ to hide it) if your font differs. Set `ui.winbar = false` to disable the winbar
 entirely. The colors come from two highlight groups that you can override:
 
 ```lua
-vim.api.nvim_set_hl(0, 'SlidevPreviewWinbar', { link = 'Comment' })   -- normal
+vim.api.nvim_set_hl(0, 'SlidevPreviewWinbar', { link = 'WinBar' })    -- normal
 vim.api.nvim_set_hl(0, 'SlidevPreviewControl', { link = 'IncSearch' }) -- control mode
 ```
 
