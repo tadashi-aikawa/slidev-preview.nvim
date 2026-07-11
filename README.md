@@ -173,6 +173,15 @@ require('slidev-preview').setup({
 
 If you prefer to start the Slidev dev server yourself (e.g., in a separate terminal), just use `:SlidevPreviewOpen` to open the browser and enable cursor sync.
 
+### Edits made in the browser (e.g. v-drag)
+
+Slidev features such as [v-drag](https://sli.dev/features/draggable) write their changes back to `slides.md` on disk. Whether the updated file shows up in your Neovim buffer automatically depends on your Neovim version:
+
+- **Neovim ≥ 0.13**: external changes are picked up in real-time via file system watchers ('autoread'), so v-drag edits appear in the buffer immediately.
+- **Neovim < 0.13**: the buffer is reloaded when Neovim regains focus (`FocusGained` + 'autoread'). If your terminal or multiplexer does not forward focus events, run `:checktime` manually to reload.
+
+In either case, reloading only happens while the buffer has no unsaved changes — save or discard your edits first, otherwise writing the buffer will overwrite the changes made from the browser.
+
 ## How it Works
 
 ```
